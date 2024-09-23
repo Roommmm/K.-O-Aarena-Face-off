@@ -7,10 +7,6 @@ class_name UCharacterBody3D
 @onready var idle: AnimationPlayer = $Idle/AnimationPlayer
 @onready var walk: AnimationPlayer = $"Standing Walk Forward/AnimationPlayer"
 @onready var node1: Node3D = $Idle
-@onready var walking: Node3D = $"Standing Walk Forward"
-@onready var standard_run: Node3D = $"Standard Run"
-@onready var run: AnimationPlayer = $"../Standard Run/AnimationPlayer"
-@onready var stand_to_roll: Node3D = $"Sprinting Forward Roll"
 
 
 ## A 3D physics body using a revamped template script.
@@ -51,6 +47,9 @@ class_name UCharacterBody3D
 ## The InputMap action string to be used for jumping
 @export var JUMP : String = "jump"
 ## A default value of 0.4 is a good starting point, stay between 0.01 and 1.0
+
+@export var ATTACK : String = "attack"
+
 @export var MOUSE_SENSITIVITY : float = 0.4
 
 var is_walking = false
@@ -164,10 +163,21 @@ func _input(event):
 			head_node.rotation.x = clampf(head_node.rotation.x, deg_to_rad(-20), deg_to_rad(30))
 
 func _physics_process(delta):
+	
+	if Input.is_action_just_pressed("attack"):
+		play_attack_efect()
+	else:
+		sword.play("IDLE")
 	if !Engine.is_editor_hint():
 		# Get input direction
 		var input_dir = Input.get_vector("left","right", "forward", "backward")
 		
+		if sword.current_animation == "attacking":
+			pass
+		elif input_dir != Vector2.ZERO and is_on_floor():
+			sword.play("walking")
+		else:
+			sword.play("IDLE")
 		# Handle crouch, sprint, walk speed.
 		if Input.is_action_pressed("crouch") or is_sliding:
 			current_speed = lerpf(current_speed, crouch_speed, delta * 10.0)
@@ -208,22 +218,20 @@ func _physics_process(delta):
 		
 		if is_sliding:
 			slide_timer -= delta
-			stand_to_roll.visible = true
+		
 			if slide_timer <= 0:
 				is_sliding = false
-				stand_to_roll.visible = false
+		
 		
 		# Handle head bob.
 		if is_sprinting:
 			head_bob_current_intensity = head_bob_intensity * 4
 			head_bob_index += head_bob_sprinting_speed * delta
-			walking.visible = false
-			standard_run.visible = true
+		
 		elif is_walking:
 			head_bob_current_intensity = head_bob_intensity * 2
 			head_bob_index += head_bob_walking_speed * delta
-			walking.visible = true
-			standard_run.visible = false
+		
 		elif is_crouching:
 			head_bob_current_intensity = head_bob_intensity
 			head_bob_index += head_bob_crouching_speed * delta
@@ -263,9 +271,7 @@ func _physics_process(delta):
 		if is_sliding:
 			direction = (transform.basis * Vector3(slide_vector.x, 0, slide_vector.y)).normalized()
 			current_speed = (slide_timer + 0.1) * slide_speed
-			stand_to_roll.visible = true
-			standard_run.visible = false
-			walking.visible = false
+			
 		if direction:
 			velocity.x = direction.x * current_speed
 			velocity.z = direction.z * current_speed
@@ -274,14 +280,9 @@ func _physics_process(delta):
 			velocity.z = move_toward(velocity.z, 0, current_speed)
 			
 		last_velocity = velocity
-		if is_walking == true:
-			stay = false
-			walk.play("mixamo_com")
-			node1.visible = false
-			walking.visible = true
-		elif is_walking == false and is_crouching == false and is_sprinting == false:
-			idle.play("mixamo_com")
-			node1.visible = true
-			walking.visible = false
 			
 		move_and_slide()
+func play_attack_efect():
+	sword.stop()
+	sword.play("attacking")
+	
